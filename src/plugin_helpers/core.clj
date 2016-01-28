@@ -6,7 +6,7 @@
   (:import [java.io File]))
 
 
-(defn lookup-handler [f m [k & ks]]
+(defn- lookup-handler [f m [k & ks]]
   (if (empty? ks)
     (-> (z/find-value m z/next k) z/right f)
     (recur f (-> (z/find-value m z/next k) z/right) ks)))
