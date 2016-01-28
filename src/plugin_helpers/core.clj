@@ -122,8 +122,19 @@
   (let [code (ansi-codes color)]
     (fn [msg & messages]
       (if messages
-        (reduce wrap-text [] messages)
-        (wrap-text msg)))))
+        (reduce #(conj % (wrap-text code %2))
+          [] messages)
+        (wrap-text code msg)))))
+
+;; common error and info colors
+(def red-text
+  (color-message :red))
+
+(def yellow-text
+  (color-message :yellow))
 
 (defn warning [msg]
-  (l/warn (str (red-text msg) "\n\n")))
+  (l/warn (red-text msg)))
+
+(defn info [msg]
+  (l/info (yellow-text msg)))

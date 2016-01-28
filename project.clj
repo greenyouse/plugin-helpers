@@ -1,4 +1,4 @@
-(defproject com.greenyouse/plugin-helpers "0.1.0"
+(defproject com.greenyouse/plugin-helpers "0.1.1"
   :description "Helper fns for leiningen plugins"
   :url "http://github.com/greenyouse/plugin-helpers"
   :license {:name "Eclipse Public License"
