@@ -126,15 +126,24 @@
           [] messages)
         (wrap-text code msg)))))
 
-;; common error and info colors
+;; common colors for messages
 (def red-text
   (color-message :red))
 
 (def yellow-text
   (color-message :yellow))
 
-(defn warning [msg]
+(defn warning
+  "Emit a warning in red text."
+  [msg]
   (l/warn (red-text msg)))
 
-(defn info [msg]
+(defn info
+  "Display some info in yellow text."
+  [msg]
   (l/info (yellow-text msg)))
+
+(defn abort
+  "Abort the process and show a message in red text."
+  [msg]
+  (l/info (red-text msg)))
