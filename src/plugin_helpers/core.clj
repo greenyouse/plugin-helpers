@@ -1,9 +1,9 @@
 (ns plugin-helpers.core
   (:require [clojure.string :as s]
             [leiningen.core.main :as l]
+            [plugin-helpers.format :as f]
             [rewrite-clj.zip :as z]))
 
-;; TODO: check with rewrite-clj about that behavior
 (defn- pad-newline
   "Prepends a newline to the last item. Temporary fix because
   prepend/append-* operations overwrite spaces and newlines."
@@ -31,7 +31,7 @@
 
 (letfn [(conj-default [f m k ks]
           (let [v (f nil)]
-            (insert-opt m k (assoc-into v ks))))]
+            (insert-opt m k (z/node (assoc-into v ks)))))]
   (defn- lookup-handler [f m [k & ks]]
     (if (empty? ks)
       (if-let [v (z/find-value m z/next k)]
@@ -80,6 +80,19 @@
                        (apply z/edit zloc f args))
        m ks))))
 
+(defn assoc-with
+  "Similar to Clojure's assoc-in, this will assoc a key value
+  pair into some file, overwriting previous values if one is
+  already present."
+  [ks v]
+  (fn [m]
+    (lookup-handler (fn [zloc]
+                      (if (nil? zloc)
+                        (f/format-expr v)
+                        (z/replace zloc
+                          (z/node (f/format-expr v)))))
+      m ks)))
+
 (defn with-file
   "Uses a zipper function f on some file"
   [filename f]
@@ -92,7 +105,7 @@
   ((partial with-file "project.clj") f))
 
 (defn replace-in-project
-  "Replace a string s nested in a file where ks is the
+  "Replace a string s nested in project.clj where ks is the
   path to the string. If the key in doesn't exist in the map
   already, it will be added and use the given string.
 
@@ -105,7 +118,7 @@
   (with-project (replace-in ks s)))
 
 (defn update-in-project
-  "Similar to clojure update-in, this updates some value in a file.
+  "Similar to Clojure's update-in, this updates some value in project.clj.
   If there's no value for the key sequence then a map will be built
   containing a default value of applying f to nil.
 
@@ -118,6 +131,14 @@
    (with-project (update-with ks f)))
   ([ks f & args]
    (with-project (update-with ks f args))))
+
+(defn assoc-in-project
+  "Similar to Clojure's assoc-in, this will assoc a key value
+  pair into some project.clj, overwriting previous values if one is
+  already present."
+  [ks v]
+  (with-project (assoc-with ks v)))
+
 
 (defn- insert-dep
   "Inserts a dep into the dependencies vector"
