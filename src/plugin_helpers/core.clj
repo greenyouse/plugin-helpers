@@ -1,49 +1,123 @@
 (ns plugin-helpers.core
   (:require [clojure.string :as s]
-            [clojure.java.io :as io]
             [leiningen.core.main :as l]
-            [rewrite-clj.zip :as z])
-  (:import [java.io File]))
+            [rewrite-clj.zip :as z]))
 
+;; TODO: check with rewrite-clj about that behavior
+(defn- pad-newline
+  "Prepends a newline to the last item. Temporary fix because
+  prepend/append-* operations overwrite spaces and newlines."
+  [expr]
+  (-> expr
+      z/down
+      z/rightmost
+      z/prepend-newline
+      (z/prepend-space 2)
+      z/up))
 
-(defn- lookup-handler [f m [k & ks]]
-  (if (empty? ks)
-    (-> (z/find-value m z/next k) z/right f)
-    (recur f (-> (z/find-value m z/next k) z/right) ks)))
+(defn- insert-opt
+  "Add a kv pair of options to the project map with a
+  default indentation of 2 spaces."
+  [project-map k v]
+  (-> (z/append-child project-map k)
+      pad-newline
+      (z/append-child v)))
+
+(defn- assoc-into
+  "Builds a nested map using some keys ks and a nil value"
+  [root ks]
+  (reduce #(assoc {} %2 %)
+    root (reverse ks)))
+
+(letfn [(conj-default [f m k ks]
+          (let [v (f nil)]
+            (insert-opt m k (assoc-into v ks))))]
+  (defn- lookup-handler [f m [k & ks]]
+    (if (empty? ks)
+      (if-let [v (z/find-value m z/next k)]
+        (-> v z/right f)
+        ;; key not found and no ks
+        (conj-default f m k nil))
+      (if-let [v (z/find-value m z/next k)]
+        (recur f (z/right v) ks)
+        ;; when keys not found, put in a blank map
+        (conj-default f m k ks)))))
 
 (defn replace-in
   "Replace a string s nested in a file where ks is the
-  path to the string
+  path to the string. If the key in doesn't exist in the map
+  already, it will be added and use the given string.
 
   example:
   (with-project (replace-in [:license :name] \"WTFPL\"))
 
   => {:project-stuff 'whatever
       :license {:name \"WTFPL\"}}"
-  [s & ks]
+  [ks s]
   (fn [m]
     (lookup-handler (fn [zloc]
                       (z/replace zloc s))
       m ks)))
 
 (defn update-with
-  "Similar to clojure update-in, this updates some value in a file"
-  [ks f & args]
-  (fn [m]
-    (lookup-handler (fn [zloc]
-                      (z/edit zloc #(apply f % args)))
-      m ks)))
+  "Similar to clojure update-in, this updates some value in a file.
+  If there's no value for the key sequence then a map will be built
+  containing a default value of applying f to nil.
+
+  example:
+  (with-project (update-with [:foo :bar] \"foobar\"))
+
+  => {:project-stuff 'whatever
+      :foo {:bar \"foobar\"}}"
+  ([ks f]
+   (fn [m]
+     (lookup-handler (fn [zloc]
+                       (z/edit zloc f))
+       m ks)))
+  ([ks f args]
+   (fn [m]
+     (lookup-handler (fn [zloc]
+                       (apply z/edit zloc f args))
+       m ks))))
 
 (defn with-file
-  "Uses a zipper funciton f on some file"
+  "Uses a zipper function f on some file"
   [filename f]
   (let [transformed (-> (z/of-file filename) f z/root-string)]
     (spit filename transformed)))
 
 (defn with-project
-  "Runs some funciton over the project.clj file"
+  "Runs some function over the project.clj file"
   [f]
   ((partial with-file "project.clj") f))
+
+(defn replace-in-project
+  "Replace a string s nested in a file where ks is the
+  path to the string. If the key in doesn't exist in the map
+  already, it will be added and use the given string.
+
+  example:
+  (replace-in-project [:license :name] \"WTFPL\")
+
+  => {:project-stuff 'whatever
+      :license {:name \"WTFPL\"}}"
+  [ks s]
+  (with-project (replace-in ks s)))
+
+(defn update-in-project
+  "Similar to clojure update-in, this updates some value in a file.
+  If there's no value for the key sequence then a map will be built
+  containing a default value of applying f to nil.
+
+  example:
+  (update-in-project [:foo :bar] \"foobar\")
+
+  => {:project-stuff 'whatever
+      :foo {:bar \"foobar\"}}"
+  ([ks f]
+   (with-project (update-with ks f)))
+  ([ks f & args]
+   (with-project (update-with ks f args))))
 
 (defn- insert-dep
   "Inserts a dep into the dependencies vector"
