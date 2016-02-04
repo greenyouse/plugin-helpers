@@ -43,6 +43,17 @@
         ;; when keys not found, put in a blank map
         (conj-default f m k ks)))))
 
+(defn remove-in
+  "Remove some key or key value pair in a file where ks is the
+  path to the key."
+  [ks]
+  (fn [m]
+    (lookup-handler (fn [zloc]
+                      (if (z/map? (z/up zloc))
+                        (-> zloc z/left z/remove z/right z/remove)
+                        (-> zloc z/left z/remove)))
+      m ks)))
+
 (defn replace-in
   "Replace a string s nested in a file where ks is the
   path to the string. If the key in doesn't exist in the map
@@ -103,6 +114,19 @@
   "Runs some function over the project.clj file"
   [f]
   ((partial with-file "project.clj") f))
+
+;; special removal for project.clj because it's a list
+(defn- remove-in*
+  [ks]
+  (fn [m]
+    (lookup-handler (fn [zloc]
+                      (-> zloc z/remove z/remove))
+      m ks)))
+
+(defn remove-in-project
+  "Removes a key value pair from the project.clj."
+  [ks]
+  (with-project (remove-in* ks)))
 
 (defn replace-in-project
   "Replace a string s nested in project.clj where ks is the
