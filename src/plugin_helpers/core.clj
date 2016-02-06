@@ -29,19 +29,36 @@
   (reduce #(assoc {} %2 %)
     root (reverse ks)))
 
-(letfn [(conj-default [f m k ks]
-          (let [v (f nil)]
-            (insert-opt m k (z/node (assoc-into v ks)))))]
-  (defn- lookup-handler [f m [k & ks]]
-    (if (empty? ks)
-      (if-let [v (z/find-value m z/next k)]
-        (-> v z/right f)
-        ;; key not found and no ks
-        (conj-default f m k nil))
-      (if-let [v (z/find-value m z/next k)]
-        (recur f (z/right v) ks)
-        ;; when keys not found, put in a blank map
-        (conj-default f m k ks)))))
+;; using callbacks for now to guarantee that each fn works well
+(defn- assoc-default
+  "A callback for assoc-in/with failures"
+  [f m k ks]
+  (let [v (f nil)
+        node (z/node (f/format-expr (assoc-into v ks)))]
+    (insert-opt m k node)))
+
+(defn- remove-default
+  "A callback for remove-in failures"
+  [f m k ks]
+  m)
+
+(defn- conj-default [f m k ks]
+  (let [v (z/sexpr (f nil))
+        node (z/node (f/format-expr (assoc-into v ks)))]
+    (insert-opt m k node)))
+
+(defn- lookup-handler [f m ks & callback]
+  (let [cback (or (first callback) conj-default)]
+    (loop [f f m m [k & ks] ks]
+      (if (empty? ks)
+        (if-let [v (z/find-value m z/next k)]
+          (-> v z/right f)
+          ;; key not found and no ks
+          (cback f m k nil))
+        (if-let [v (z/find-value m z/next k)]
+          (recur f (z/right v) ks)
+          ;; when keys not found, put in a blank map
+          (cback f m k ks))))))
 
 (defn remove-in
   "Remove some key or key value pair in a file where ks is the
@@ -52,7 +69,7 @@
                       (if (z/map? (z/up zloc))
                         (-> zloc z/left z/remove z/right z/remove)
                         (-> zloc z/left z/remove)))
-      m ks)))
+      m ks remove-default)))
 
 (defn replace-in
   "Replace a string s nested in a file where ks is the
@@ -76,20 +93,24 @@
   containing a default value of applying f to nil.
 
   example:
-  (with-project (update-with [:foo :bar] \"foobar\"))
+  (with-project (update-with [:foo :bar] (constantly \"foobar\")))
 
   => {:project-stuff 'whatever
       :foo {:bar \"foobar\"}}"
   ([ks f]
    (fn [m]
      (lookup-handler (fn [zloc]
-                       (z/edit zloc f))
-       m ks)))
+                       (if (nil? zloc)
+                         (f nil)
+                         (z/edit zloc f)))
+       m ks assoc-default)))
   ([ks f args]
    (fn [m]
      (lookup-handler (fn [zloc]
-                       (apply z/edit zloc f args))
-       m ks))))
+                       (if (nil? zloc)
+                         (f nil args)
+                         (apply z/edit zloc f args)))
+       m ks assoc-default))))
 
 (defn assoc-with
   "Similar to Clojure's assoc-in, this will assoc a key value
@@ -99,10 +120,10 @@
   (fn [m]
     (lookup-handler (fn [zloc]
                       (if (nil? zloc)
-                        (f/format-expr v)
+                        v
                         (z/replace zloc
                           (z/node (f/format-expr v)))))
-      m ks)))
+      m ks assoc-default)))
 
 (defn with-file
   "Uses a zipper function f on some file"
@@ -121,7 +142,7 @@
   (fn [m]
     (lookup-handler (fn [zloc]
                       (-> zloc z/remove z/remove))
-      m ks)))
+      m ks remove-default)))
 
 (defn remove-in-project
   "Removes a key value pair from the project.clj."
