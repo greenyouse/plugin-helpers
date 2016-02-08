@@ -104,7 +104,7 @@
   pair into some file, overwriting previous values if one is
   already present.
 
-  (with-project (assoc-with [:license :name] \"WTFPL\"))
+  (with-project (assoc-with [:license :name] \"Foo License\"))
 
   => {:project-stuff 'whatever
       :license {:name \"Foo License\"}}"
@@ -165,7 +165,7 @@
   pair into some project.clj, overwriting previous values if one is
   already present.
 
-  (with-project (assoc-with [:license :name] \"WTFPL\"))
+  (with-project (assoc-with [:license :name] \"Foo License\"))
 
   => {:project-stuff 'whatever
       :license {:name \"Foo License\"}}"
