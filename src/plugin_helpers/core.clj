@@ -274,4 +274,4 @@
 (defn abort
   "Abort the process and show a message in red text."
   [msg]
-  (l/info (red-text msg)))
+  (l/abort (red-text msg)))
