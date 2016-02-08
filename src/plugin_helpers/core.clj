@@ -52,7 +52,10 @@
     (loop [f f m m [k & ks] ks]
       (if (empty? ks)
         (if-let [v (z/find-value m z/next k)]
-          (-> v z/right f)
+          ;; maps + project.clj will have kv structure
+          (if (some #(% (z/up v)) [z/map? z/list?])
+            (-> v z/right f)
+            (f v))
           ;; key not found and no ks
           (cback f m k nil))
         (if-let [v (z/find-value m z/next k)]
@@ -67,25 +70,9 @@
   (fn [m]
     (lookup-handler (fn [zloc]
                       (if (z/map? (z/up zloc))
-                        (-> zloc z/left z/remove z/right z/remove)
-                        (-> zloc z/left z/remove)))
+                        (-> zloc z/remove z/remove)
+                        (-> zloc z/remove)))
       m ks remove-default)))
-
-(defn replace-in
-  "Replace a string s nested in a file where ks is the
-  path to the string. If the key in doesn't exist in the map
-  already, it will be added and use the given string.
-
-  example:
-  (with-project (replace-in [:license :name] \"WTFPL\"))
-
-  => {:project-stuff 'whatever
-      :license {:name \"WTFPL\"}}"
-  [ks s]
-  (fn [m]
-    (lookup-handler (fn [zloc]
-                      (z/replace zloc s))
-      m ks)))
 
 (defn update-with
   "Similar to clojure update-in, this updates some value in a file.
@@ -115,12 +102,21 @@
 (defn assoc-with
   "Similar to Clojure's assoc-in, this will assoc a key value
   pair into some file, overwriting previous values if one is
-  already present."
+  already present.
+
+  (with-project (assoc-with [:license :name] \"WTFPL\"))
+
+  => {:project-stuff 'whatever
+      :license {:name \"Foo License\"}}"
   [ks v]
   (fn [m]
     (lookup-handler (fn [zloc]
-                      (if (nil? zloc)
-                        v
+                      (cond
+                        (nil? zloc) v
+
+                        (string? v) (z/replace zloc v)
+
+                        :default
                         (z/replace zloc
                           (z/node (f/format-expr v)))))
       m ks assoc-default)))
@@ -149,19 +145,6 @@
   [ks]
   (with-project (remove-in* ks)))
 
-(defn replace-in-project
-  "Replace a string s nested in project.clj where ks is the
-  path to the string. If the key in doesn't exist in the map
-  already, it will be added and use the given string.
-
-  example:
-  (replace-in-project [:license :name] \"WTFPL\")
-
-  => {:project-stuff 'whatever
-      :license {:name \"WTFPL\"}}"
-  [ks s]
-  (with-project (replace-in ks s)))
-
 (defn update-in-project
   "Similar to Clojure's update-in, this updates some value in project.clj.
   If there's no value for the key sequence then a map will be built
@@ -180,7 +163,12 @@
 (defn assoc-in-project
   "Similar to Clojure's assoc-in, this will assoc a key value
   pair into some project.clj, overwriting previous values if one is
-  already present."
+  already present.
+
+  (with-project (assoc-with [:license :name] \"WTFPL\"))
+
+  => {:project-stuff 'whatever
+      :license {:name \"Foo License\"}}"
   [ks v]
   (with-project (assoc-with ks v)))
 
