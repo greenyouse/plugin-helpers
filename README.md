@@ -23,8 +23,8 @@ a quick overview of the important parts:
 
 ### project.clj functions
 
-For the next few examples we'll use an example of a minimal project.clj
-and show how running the different functions updates its state. 
+For the next few examples we'll use a minimal project.clj config and
+show how running each function updates its state.
 
 ```clj
 {:description "foobar"
@@ -55,7 +55,7 @@ some item from the project file:
  :dependencies [[org.clojure/clojure "1.8.0"]]}
 ```
 
-The `update-in-project` will work similar to Clojure's `update` by
+The `update-in-project` will work similar to Clojure's `update-in` by
 applying some function at a given location:
 ```clj
 (update-in-project [:description] (constantly "foo"))
@@ -125,13 +125,14 @@ docs or source code for more information.
 
 ### message functions
 
-There are a few message helper functions for color text output on the
+There are a few message helper functions for coloring text output on the
 console. The `yellow-text` and `red-text` will output some text to the
 console with the relevant ansi color codes. If you want another color,
-you can use the `color-message` function and a value from `ansi-codes`.
+you can wrap text with the `color-message` function and one of the
+values from `ansi-codes`. 
 
 There are also `warning`, `info`, and `abort` that are wrappers over
-Leiningen functions of the same names but with better color encoding.
+Leiningen functions of the same names but with color encoding.
 
 
 ## Continuous Integration
